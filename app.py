@@ -1,36 +1,48 @@
 import streamlit as st
 import pandas as pd
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Gaviota Visibility", layout="wide")
 
 st.title("🌊 Gaviota Coast Daily Visibility Dashboard")
 st.markdown("Live spearfishing forecast based on swell, wind, and tide conditions.")
 
-# --- Fetch Swell Data from CDIP (Harvest Buoy) ---
-cdip_url = "https://cdip.ucsd.edu/data_access?dataset=historic&format=table&station_id=100&sensor_id=waveHeight"
+# --- Fetch Swell & Wind Data (Marine Weather / NOAA fallback) ---
 try:
     swell_data = requests.get("https://marine.weather.gov/MapClick.php?lat=34.4&lon=-120.1&unit=0&lg=english&FcstType=json").json()
-    swell_height = swell_data['currentobservation']['swell_height_ft'] if 'currentobservation' in swell_data else "2.6"
-    swell_period = swell_data['currentobservation']['swell_period_sec'] if 'currentobservation' in swell_data else "13"
+    swell_height = swell_data['currentobservation'].get('swell_height_ft', "2.6")
+    swell_period = swell_data['currentobservation'].get('swell_period_sec', "13")
     swell_dir = "WNW"
+    wind_speed = swell_data['currentobservation'].get('WindSpd', "5")
+    wind_dir = swell_data['currentobservation'].get('WindDir', "W")
 except:
     swell_height = "2.6"
     swell_period = "13"
     swell_dir = "WNW"
-
-# --- Fetch Wind Data ---
-try:
-    wind_speed = swell_data['currentobservation']['WindSpd']
-    wind_dir = swell_data['currentobservation']['WindDir']
-except:
     wind_speed = "5"
     wind_dir = "W"
 
-# --- Fetch Tide Data (Mock Rising for now) ---
+# --- Fetch Tide Data from NOAA (SB Harbor Station) ---
 tide_stage = "Rising"
 current_dir = "W (up)"
+try:
+    now = datetime.utcnow()
+    begin_date = now.strftime('%Y%m%d')
+    end_date = (now + timedelta(days=1)).strftime('%Y%m%d')
+    tide_url = f"https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date={begin_date}&end_date={end_date}&station=9411340&product=predictions&datum=MLLW&units=english&time_zone=gmt&format=json&interval=h"
+    tide_data = requests.get(tide_url).json()['predictions']
+    current_time = now.strftime('%Y-%m-%d %H')
+    levels = [(entry['t'], float(entry['v'])) for entry in tide_data if entry['t'].startswith(current_time)]
+    if len(levels) >= 2:
+        if levels[1][1] > levels[0][1]:
+            tide_stage = "Rising"
+            current_dir = "W (up)"
+        else:
+            tide_stage = "Falling"
+            current_dir = "E (down)"
+except:
+    pass
 
 # --- Forecast Engine ---
 def predict_vis(score_base):
