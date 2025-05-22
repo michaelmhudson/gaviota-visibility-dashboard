@@ -186,8 +186,13 @@ with st.form("log_form"):
 
 # ---------- Dive Logbook Viewer ----------
 st.subheader("📚 Your Dive Logbook")
+expected_cols = ["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"]
 log_df = pd.read_csv(log_file)
-log_df = log_df[["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"]]
+missing_cols = [col for col in expected_cols if col not in log_df.columns]
+if missing_cols:
+    for col in missing_cols:
+        log_df[col] = ""
+log_df = log_df[expected_cols]
 st.dataframe(log_df.sort_values(by="Date", ascending=False), use_container_width=True)
 
 # ---------- Footer ----------
