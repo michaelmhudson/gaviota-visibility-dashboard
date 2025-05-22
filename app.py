@@ -16,23 +16,28 @@ st.markdown("""
         font-family: 'Inter', sans-serif !important;
         color: #f1f1f1;
     }
+
     h1, h2, h3, h4 {
         font-weight: 700;
         letter-spacing: -0.5px;
     }
+
     .block-container {
         padding-top: 0rem;
     }
+
     .hero {
         background-image: url('https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.jpg');
         background-size: cover;
         background-position: center;
+        background-repeat: no-repeat;
         padding: 4rem 2rem;
         border-radius: 0.5rem;
         color: white;
         text-align: center;
     }
     </style>
+""", unsafe_allow_html=True)
 """, unsafe_allow_html=True)
 
 st.markdown("""
