@@ -7,7 +7,7 @@ import os
 # ---------- Config ----------
 st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- Custom Styles with Inter Font and Hero Banner ----------
+# ---------- Custom Font ----------
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap');
@@ -22,12 +22,14 @@ st.markdown("""
         font-weight: 700;
         letter-spacing: -0.5px;
     }
-
     .block-container {
         padding-top: 0rem;
     }
+    </style>
+""", unsafe_allow_html=True)
 
-  st.image(
+# ---------- Hero Section ----------
+st.image(
     "https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.jpg",
     use_column_width=True,
     caption=None
