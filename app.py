@@ -48,14 +48,14 @@ st.subheader("🔎 Forecast")
 with st.spinner("Pulling live swell, wind, and tide data..."):
     try:
         swell_data = requests.get("https://marine.weather.gov/MapClick.php?lat=34.4&lon=-120.1&unit=0&lg=english&FcstType=json").json()
-        swell_height = swell_data['currentobservation'].get('swell_height_ft', "2.6")
-        swell_period = swell_data['currentobservation'].get('swell_period_sec', "13")
+        swell_height = float(swell_data['currentobservation'].get('swell_height_ft', 2.6))
+        swell_period = float(swell_data['currentobservation'].get('swell_period_sec', 13))
         swell_dir = "WNW"
-        wind_speed = swell_data['currentobservation'].get('WindSpd', "5")
+        wind_speed = float(swell_data['currentobservation'].get('WindSpd', 5))
         wind_dir = swell_data['currentobservation'].get('WindDir', "W")
     except:
-        swell_height, swell_period, swell_dir = "2.6", "13", "WNW"
-        wind_speed, wind_dir = "5", "W"
+        swell_height, swell_period, swell_dir = 2.6, 13, "WNW"
+        wind_speed, wind_dir = 5, "W"
 
     tide_stage = "Rising"
     current_dir = "W (up)"
@@ -76,11 +76,9 @@ with st.spinner("Pulling live swell, wind, and tide data..."):
         pass
 
     def predict_vis(score_base):
-        swell = float(swell_height)
-        wind = float(wind_speed)
-        if swell > 3 or wind > 10:
-            return score_base - 1
-        elif swell < 2 and wind < 5:
+        if swell_height > 3 or wind_speed > 10:
+            return max(score_base - 1, 1)
+        elif swell_height < 2 and wind_speed < 5:
             return min(score_base + 1, 5)
         return score_base
 
@@ -93,30 +91,38 @@ with st.spinner("Pulling live swell, wind, and tide data..."):
     forecast = []
     for spot, base in spots:
         score = predict_vis(base)
-        vis_est = {5: "15+ ft", 4: "8–10 ft", 3: "6–8 ft", 2: "4–6 ft", 1: "<4 ft"}[max(1, min(5, round(score)))]
+        vis_est = {5: "15+ ft", 4: "8–10 ft", 3: "6–8 ft", 2: "4–6 ft", 1: "<4 ft"}[score]
         forecast.append({
             "Spot": spot,
             "Visibility": vis_est,
             "Tide": tide_stage,
             "Current": current_dir,
-            "Swell": f"{swell_height} @ {swell_period}s {swell_dir}",
-            "Wind": f"{wind_speed} kt {wind_dir}",
-            "Score": round(score)
+            "Swell": f"{swell_height:.1f} @ {swell_period:.0f}s {swell_dir}",
+            "Wind": f"{wind_speed:.0f} kt {wind_dir}",
+            "Score": score
         })
 
     df = pd.DataFrame(forecast)
-
     def highlight_score(val):
         bg = '#f4cccc' if val <= 2 else '#fff2cc' if val <= 4 else '#b7e1cd'
         return f'background-color: {bg}; color: #000000'
-
     styled_df = df.style.format({"Score": "{:.0f}"}).applymap(highlight_score, subset=["Score"])
     st.dataframe(styled_df, use_container_width=True)
+
     best = df[df['Score'] == df['Score'].max()]
     st.subheader("🔱 Best Dive Pick Today")
     st.markdown(f"**{best.iloc[0]['Spot']}** — {best.iloc[0]['Visibility']} — {int(best.iloc[0]['Score'])}/5")
 
-# ---------- Log a Dive ----------
+    st.markdown("""
+    ### 📘 How Forecast is Calculated
+    Visibility score is based on this logic:
+    - **Subtract 1** if swell > 3 ft or wind > 10 kt (murky/surgey)
+    - **Add 1** if swell < 2 ft and wind < 5 kt (clean & calm)
+    - Otherwise, keep baseline rating for the spot
+    Future versions will learn from your logs to adjust these predictions.
+    """)
+
+# ---------- Dive Logging ----------
 st.subheader("📘 Log a Dive")
 with st.form("log_form"):
     col1, col2 = st.columns(2)
@@ -134,7 +140,7 @@ with st.form("log_form"):
         new_entry.to_csv(LOG_FILE, mode='a', header=False, index=False)
         st.success("Dive logged successfully!")
 
-# ---------- Dive Logbook ----------
+# ---------- Logbook ----------
 st.subheader("📚 Your Dive Logbook")
 try:
     df = pd.read_csv(LOG_FILE)
