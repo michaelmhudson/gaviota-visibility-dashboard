@@ -17,56 +17,27 @@ st.markdown("""
         color: #f1f1f1;
         background-color: #0e1117;
     }
-
-    h1, h2, h3, h4 {
-        font-weight: 700;
-        letter-spacing: -0.5px;
-    }
-    .block-container {
-        padding-top: 0rem;
-    }
-    .hero-container {
-        position: relative;
-        width: 100%;
-    }
-    .hero-container img {
-        width: 100%;
-        border-radius: 0.5rem;
-        max-height: 280px;
-        object-fit: cover;
-    }
+    .block-container { padding-top: 0rem; }
+    .hero-container img { width: 100%; max-height: 280px; object-fit: cover; border-radius: 0.5rem; }
     .hero-text {
         position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: white;
-        text-align: center;
+        top: 50%; left: 50%; transform: translate(-50%, -50%);
         background: rgba(0, 0, 0, 0.4);
         padding: 1rem 1.5rem;
+        text-align: center;
         border-radius: 0.5rem;
         width: 90%;
     }
-    .hero-text h1 {
-        font-size: 1.8rem;
-        margin-bottom: 0.3rem;
-    }
-    .hero-text p {
-        font-size: 1rem;
-        color: #e0e0e0;
-    }
+    .hero-text h1 { font-size: 1.8rem; margin-bottom: 0.3rem; }
+    .hero-text p { font-size: 1rem; color: #e0e0e0; }
     @media (min-width: 768px) {
-        .hero-text h1 {
-            font-size: 2.2rem;
-        }
-        .hero-text p {
-            font-size: 1.2rem;
-        }
+        .hero-text h1 { font-size: 2.2rem; }
+        .hero-text p { font-size: 1.2rem; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# ---------- Hero Image with Overlay Text ----------
+# ---------- Hero ----------
 st.markdown("""
 <div class="hero-container">
     <img src="https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.png" />
@@ -77,7 +48,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---------- Pull Conditions ----------
+# ---------- Pull Live Conditions ----------
 with st.spinner("Pulling live swell, wind, and tide data..."):
     try:
         swell_data = requests.get("https://marine.weather.gov/MapClick.php?lat=34.4&lon=-120.1&unit=0&lg=english&FcstType=json").json()
@@ -141,15 +112,8 @@ for spot, base in spots:
 df = pd.DataFrame(forecast)
 
 def highlight_score(val):
-    styles = {
-        5: ('#b7e1cd', '#000000'),
-        4: ('#fff2cc', '#000000'),
-        3: ('#fff2cc', '#000000'),
-        2: ('#f4cccc', '#000000'),
-        1: ('#f4cccc', '#000000')
-    }
-    bg, fg = styles.get(val, ('#333', '#f1f1f1'))
-    return f'background-color: {bg}; color: {fg}'
+    bg = '#f4cccc' if val <= 2 else '#fff2cc' if val <= 4 else '#b7e1cd'
+    return f'background-color: {bg}; color: #000000'
 
 styled_df = df.style.format({"Score": "{:.0f}"}).applymap(highlight_score, subset=["Score"])
 
@@ -164,8 +128,9 @@ st.markdown(f"**{best.iloc[0]['Spot']}** — {best.iloc[0]['Visibility']} — {i
 # ---------- Log Dive Section ----------
 st.subheader("📘 Log a Dive")
 log_file = "dive_log.csv"
+expected_cols = ["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"]
 if not os.path.exists(log_file):
-    pd.DataFrame(columns=["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"]).to_csv(log_file, index=False)
+    pd.DataFrame(columns=expected_cols).to_csv(log_file, index=False)
 
 with st.form("log_form"):
     col1, col2 = st.columns(2)
@@ -179,14 +144,12 @@ with st.form("log_form"):
         notes = st.text_area("Notes", placeholder="Surge, bait, thermocline...")
     submitted = st.form_submit_button("Save Entry")
     if submitted:
-        new_entry = pd.DataFrame([[date, time.strftime('%H:%M'), spot, vis, notes, fish]],
-                                 columns=["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"])
+        new_entry = pd.DataFrame([{k: v for k, v in zip(expected_cols, [date, time.strftime('%H:%M'), spot, vis, notes, fish])}])
         new_entry.to_csv(log_file, mode='a', header=False, index=False)
         st.success("Dive logged successfully!")
 
 # ---------- Dive Logbook Viewer ----------
 st.subheader("📚 Your Dive Logbook")
-expected_cols = ["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"]
 log_df = pd.read_csv(log_file)
 missing_cols = [col for col in expected_cols if col not in log_df.columns]
 if missing_cols:
