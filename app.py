@@ -5,7 +5,16 @@ from datetime import datetime, timedelta
 import os
 
 # ---------- Config ----------
-st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="expanded")
+
+# ---------- Sidebar Navigation ----------
+st.sidebar.title("🧭 Navigation")
+st.sidebar.markdown("""
+- [🔎 Forecast](#forecast)
+- [📘 Log a Dive](#log-a-dive)
+- [📚 Your Dive Logbook](#your-dive-logbook)
+- [📡 Resources](#resources)
+""")
 
 # ---------- Custom Font & Styling ----------
 st.markdown("""
@@ -32,6 +41,8 @@ st.markdown("""
     .hero-container img {
         width: 100%;
         border-radius: 0.5rem;
+        max-height: 280px;
+        object-fit: cover;
     }
     .hero-text {
         position: absolute;
@@ -41,13 +52,13 @@ st.markdown("""
         color: white;
         text-align: center;
         background: rgba(0, 0, 0, 0.4);
-        padding: 2rem;
+        padding: 1rem 1.5rem;
         border-radius: 0.5rem;
         width: 90%;
     }
     .hero-text h1 {
-        font-size: 2rem;
-        margin-bottom: 0.5rem;
+        font-size: 1.8rem;
+        margin-bottom: 0.3rem;
     }
     .hero-text p {
         font-size: 1rem;
@@ -55,7 +66,7 @@ st.markdown("""
     }
     @media (min-width: 768px) {
         .hero-text h1 {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
         }
         .hero-text p {
             font-size: 1.2rem;
