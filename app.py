@@ -72,7 +72,7 @@ st.markdown("""
     <img src="https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.png" />
     <div class="hero-text">
         <h1>Gaviota Coast Spearfishing Dashboard</h1>
-        <p>Live visibility forecasts. Personal dive log. Smart predictions.</p>
+        <p>Live visibility forecasts. Smart predictions. Your personal dive log.</p>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -187,6 +187,7 @@ with st.form("log_form"):
 # ---------- Dive Logbook Viewer ----------
 st.subheader("📚 Your Dive Logbook")
 log_df = pd.read_csv(log_file)
+log_df = log_df[["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"]]
 st.dataframe(log_df.sort_values(by="Date", ascending=False), use_container_width=True)
 
 # ---------- Footer ----------
