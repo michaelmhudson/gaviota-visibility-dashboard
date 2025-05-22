@@ -14,7 +14,7 @@ st.markdown("""
         padding-top: 0rem;
     }
     .hero {
-        background-image: url('https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.jpg');
+        background-image: url('https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.png');
         background-size: cover;
         background-position: center;
         padding: 4rem 2rem;
