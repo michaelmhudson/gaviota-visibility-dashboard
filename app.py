@@ -30,7 +30,7 @@ st.markdown("""
 
 # ---------- Hero Section ----------
 st.image(
-    "https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.jpg",
+    "https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.png",
     use_column_width=True,
     caption=None
 )
