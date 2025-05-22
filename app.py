@@ -22,23 +22,6 @@ st.markdown("""
         color: white;
         text-align: center;
     }
-   .logo-bar {
-    text-align: center;
-    margin: 1rem 0;
-}
-.logo-bar img {
-    height: 40px;
-    max-width: 100%;
-    object-fit: contain;
-    margin: 0 auto;
-    display: block;
-}
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-    <div class="logo-bar">
-        <img src="https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/logo.png" alt="Logo">
     </div>
     <div class="hero">
         <h1>Gaviota Coast Spearfishing Dashboard</h1>
