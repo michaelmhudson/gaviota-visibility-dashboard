@@ -72,7 +72,7 @@ st.markdown("""
     <img src="https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.png" />
     <div class="hero-text">
         <h1>Gaviota Coast Spearfishing Dashboard</h1>
-        <p>Live visibility forecasts. Smart predictions. Your personal dive log.</p>
+        <p>Live visibility forecasts. Personal dive log. Real-world informed predictions.</p>
     </div>
 </div>
 """, unsafe_allow_html=True)
