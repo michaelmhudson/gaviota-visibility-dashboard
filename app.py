@@ -50,7 +50,7 @@ with st.spinner("Pulling live swell, wind, tide, rain, SST and chlorophyll data.
         swell_dir = "WNW"
         wind_speed = float(swell_data['currentobservation'].get('WindSpd', 5))
         wind_dir = swell_data['currentobservation'].get('WindDir', "W")
-        sst = float(swell_data['currentobservation'].get('Temp', 60))  # Approx SST in °F
+        sst = float(swell_data['currentobservation'].get('Temp', 60))
     except:
         swell_height, swell_period, swell_dir = 2.6, 13, "WNW"
         wind_speed, wind_dir, sst = 5, "W", 60
@@ -152,12 +152,12 @@ with st.spinner("Pulling live swell, wind, tide, rain, SST and chlorophyll data.
 
     st.markdown("""
     ### 📘 Forecast Scoring Breakdown
-    - Swell > 3 ft or Wind > 10 kt → −1
-    - Swell < 2 ft and Wind < 5 kt → +1
-    - Tide rate > 1.5 ft (12 hrs) → −1
-    - Rain > 0.1" → −1
-    - SST < 57°F → −1
-    - Chlorophyll > 2 mg/m³ → −1
+    - Swell > 3 ft or Wind > 10 kt -> −1
+    - Swell < 2 ft and Wind < 5 kt -> +1
+    - Tide rate > 1.5 ft (12 hrs) -> −1
+    - Rain > 0.1" -> −1
+    - SST < 57°F -> −1
+    - Chlorophyll > 2 mg/m³ -> −1
     """)
 
 st.caption(f"Live data from NOAA, CDIP, and ERDDAP — updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
