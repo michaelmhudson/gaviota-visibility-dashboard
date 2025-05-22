@@ -128,5 +128,44 @@ with st.spinner("Pulling live swell, wind, and tide data..."):
     - Otherwise, keep baseline rating for the spot
     """)
 
+    st.subheader("📊 Conditions Snapshot")
+    st.bar_chart(pd.DataFrame({
+        "Swell Height (ft)": [swell_height],
+        "Wind Speed (kt)": [wind_speed]
+    }))
+
+# ---------- Log a Dive ----------
+st.subheader("📘 Log a Dive")
+with st.form("log_form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        date = st.date_input("Date", value=datetime.today())
+        time = st.time_input("Time", value=datetime.now().time())
+        spot = st.selectbox("Spot", [s["Spot"] for s in forecast])
+    with col2:
+        vis = st.selectbox("Observed Visibility", ["<4 ft", "4–6 ft", "6–8 ft", "8–10 ft", "15+ ft"])
+        fish = st.text_input("Fish Taken")
+        notes = st.text_area("Notes", placeholder="Surge, bait, thermocline...")
+    submitted = st.form_submit_button("Save Entry")
+    if submitted:
+        new_entry = pd.DataFrame([{ "Date": date, "Time": time.strftime('%H:%M'), "Spot": spot, "Visibility": vis, "Notes": notes, "Fish Taken": fish }])
+        new_entry.to_csv(LOG_FILE, mode='a', header=False, index=False)
+        st.success("Dive logged successfully!")
+
+# ---------- Dive Logbook ----------
+st.subheader("📚 Your Dive Logbook")
+try:
+    df = pd.read_csv(LOG_FILE)
+    if df.shape[1] != len(EXPECTED_COLS):
+        df.columns = EXPECTED_COLS[:df.shape[1]] + [f"extra_{i}" for i in range(df.shape[1] - len(EXPECTED_COLS))]
+    for col in EXPECTED_COLS:
+        if col not in df.columns:
+            df[col] = ""
+    df = df[EXPECTED_COLS]
+    st.dataframe(df.sort_values(by="Date", ascending=False), use_container_width=True)
+except Exception as e:
+    st.error("Log file is corrupted or unreadable.")
+    st.exception(e)
+
 # ---------- Footer ----------
 st.caption(f"Live data from NOAA & CDIP — Last updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
