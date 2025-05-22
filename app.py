@@ -3,8 +3,6 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 import os
-import matplotlib.pyplot as plt
-import numpy as np
 
 # ---------- Config ----------
 st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="collapsed")
@@ -125,21 +123,12 @@ with st.spinner("Pulling live swell, wind, and tide data..."):
     - Otherwise, keep baseline rating for the spot
     """)
 
-    # ---------- Mini Charts ----------
+    # ---------- Native Streamlit Charts ----------
     st.subheader("📈 Conditions Snapshot")
-    col1, col2 = st.columns(2)
-    with col1:
-        fig, ax = plt.subplots()
-        ax.bar(["Swell Height"], [swell_height], color='#1f77b4')
-        ax.set_ylim(0, 6)
-        ax.set_ylabel("ft")
-        st.pyplot(fig)
-    with col2:
-        fig2, ax2 = plt.subplots()
-        ax2.bar(["Wind Speed"], [wind_speed], color='#ff7f0e')
-        ax2.set_ylim(0, 20)
-        ax2.set_ylabel("kt")
-        st.pyplot(fig2)
+    st.bar_chart(pd.DataFrame({
+        "Swell Height (ft)": [swell_height],
+        "Wind Speed (kt)": [wind_speed]
+    }))
 
 # ---------- Footer ----------
 st.caption(f"Live data from NOAA & CDIP — Last updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
