@@ -43,14 +43,23 @@ st.markdown("""
         background: rgba(0, 0, 0, 0.4);
         padding: 2rem;
         border-radius: 0.5rem;
+        width: 90%;
     }
     .hero-text h1 {
-        font-size: 2.5rem;
+        font-size: 2rem;
         margin-bottom: 0.5rem;
     }
     .hero-text p {
-        font-size: 1.2rem;
+        font-size: 1rem;
         color: #e0e0e0;
+    }
+    @media (min-width: 768px) {
+        .hero-text h1 {
+            font-size: 2.5rem;
+        }
+        .hero-text p {
+            font-size: 1.2rem;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
