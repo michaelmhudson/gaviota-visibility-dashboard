@@ -111,9 +111,14 @@ with st.spinner("Pulling live swell, wind, and tide data..."):
     styled_df = df.style.format({"Score": "{:.0f}"}).applymap(highlight_score, subset=["Score"])
     st.dataframe(styled_df, use_container_width=True)
 
-    best = df[df['Score'] == df['Score'].max()]
+    best = df[df['Score'] == df['Score'].max()].iloc[0]
     st.subheader("🔱 Best Dive Pick Today")
-    st.markdown(f"**{best.iloc[0]['Spot']}** — {best.iloc[0]['Visibility']} — {int(best.iloc[0]['Score'])}/5")
+    st.markdown(f"""
+    **{best['Spot']}** — {best['Visibility']} — {int(best['Score'])}/5
+    - **Swell**: {best['Swell']}
+    - **Wind**: {best['Wind']}
+    - **Tide**: {best['Tide']} ({best['Current']})
+    """)
 
     st.markdown("""
     ### 📘 How Forecast is Calculated
@@ -122,13 +127,6 @@ with st.spinner("Pulling live swell, wind, and tide data..."):
     - **Add 1** if swell < 2 ft and wind < 5 kt (clean & calm)
     - Otherwise, keep baseline rating for the spot
     """)
-
-    # ---------- Native Streamlit Charts ----------
-    st.subheader("📈 Conditions Snapshot")
-    st.bar_chart(pd.DataFrame({
-        "Swell Height (ft)": [swell_height],
-        "Wind Speed (kt)": [wind_speed]
-    }))
 
 # ---------- Footer ----------
 st.caption(f"Live data from NOAA & CDIP — Last updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
