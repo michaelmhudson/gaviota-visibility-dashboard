@@ -3,6 +3,8 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 import os
+import matplotlib.pyplot as plt
+import numpy as np
 
 # ---------- Config ----------
 st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="collapsed")
@@ -103,9 +105,11 @@ with st.spinner("Pulling live swell, wind, and tide data..."):
         })
 
     df = pd.DataFrame(forecast)
+
     def highlight_score(val):
         bg = '#f4cccc' if val <= 2 else '#fff2cc' if val <= 4 else '#b7e1cd'
         return f'background-color: {bg}; color: #000000'
+
     styled_df = df.style.format({"Score": "{:.0f}"}).applymap(highlight_score, subset=["Score"])
     st.dataframe(styled_df, use_container_width=True)
 
@@ -119,41 +123,23 @@ with st.spinner("Pulling live swell, wind, and tide data..."):
     - **Subtract 1** if swell > 3 ft or wind > 10 kt (murky/surgey)
     - **Add 1** if swell < 2 ft and wind < 5 kt (clean & calm)
     - Otherwise, keep baseline rating for the spot
-    Future versions will learn from your logs to adjust these predictions.
     """)
 
-# ---------- Dive Logging ----------
-st.subheader("📘 Log a Dive")
-with st.form("log_form"):
+    # ---------- Mini Charts ----------
+    st.subheader("📈 Conditions Snapshot")
     col1, col2 = st.columns(2)
     with col1:
-        date = st.date_input("Date", value=datetime.today())
-        time = st.time_input("Time", value=datetime.now().time())
-        spot = st.selectbox("Spot", [s["Spot"] for s in forecast])
+        fig, ax = plt.subplots()
+        ax.bar(["Swell Height"], [swell_height], color='#1f77b4')
+        ax.set_ylim(0, 6)
+        ax.set_ylabel("ft")
+        st.pyplot(fig)
     with col2:
-        vis = st.selectbox("Observed Visibility", ["<4 ft", "4–6 ft", "6–8 ft", "8–10 ft", "15+ ft"])
-        fish = st.text_input("Fish Taken")
-        notes = st.text_area("Notes", placeholder="Surge, bait, thermocline...")
-    submitted = st.form_submit_button("Save Entry")
-    if submitted:
-        new_entry = pd.DataFrame([{ "Date": date, "Time": time.strftime('%H:%M'), "Spot": spot, "Visibility": vis, "Notes": notes, "Fish Taken": fish }])
-        new_entry.to_csv(LOG_FILE, mode='a', header=False, index=False)
-        st.success("Dive logged successfully!")
-
-# ---------- Logbook ----------
-st.subheader("📚 Your Dive Logbook")
-try:
-    df = pd.read_csv(LOG_FILE)
-    if df.shape[1] != len(EXPECTED_COLS):
-        df.columns = EXPECTED_COLS[:df.shape[1]] + [f"extra_{i}" for i in range(df.shape[1] - len(EXPECTED_COLS))]
-    for col in EXPECTED_COLS:
-        if col not in df.columns:
-            df[col] = ""
-    df = df[EXPECTED_COLS]
-    st.dataframe(df.sort_values(by="Date", ascending=False), use_container_width=True)
-except Exception as e:
-    st.error("Log file is corrupted or unreadable.")
-    st.exception(e)
+        fig2, ax2 = plt.subplots()
+        ax2.bar(["Wind Speed"], [wind_speed], color='#ff7f0e')
+        ax2.set_ylim(0, 20)
+        ax2.set_ylabel("kt")
+        st.pyplot(fig2)
 
 # ---------- Footer ----------
 st.caption(f"Live data from NOAA & CDIP — Last updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
