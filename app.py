@@ -7,7 +7,7 @@ import os
 # ---------- Config ----------
 st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- Custom Font ----------
+# ---------- Custom Font & Styling ----------
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap');
@@ -25,53 +25,78 @@ st.markdown("""
     .block-container {
         padding-top: 0rem;
     }
+    .hero-container {
+        position: relative;
+        width: 100%;
+    }
+    .hero-container img {
+        width: 100%;
+        border-radius: 0.5rem;
+    }
+    .hero-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        text-align: center;
+        background: rgba(0, 0, 0, 0.4);
+        padding: 2rem;
+        border-radius: 0.5rem;
+    }
+    .hero-text h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .hero-text p {
+        font-size: 1.2rem;
+        color: #e0e0e0;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# ---------- Hero Section ----------
-st.image(
-    "https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.png",
-    use_column_width=True,
-    caption=None
-)
-
+# ---------- Hero Image with Overlay Text ----------
 st.markdown("""
-<div style='text-align: center; padding: 1rem 0;'>
-    <h1 style='margin-bottom: 0.25rem;'>Gaviota Coast Spearfishing Dashboard</h1>
-    <p style='font-size: 1.1rem; color: #cccccc;'>Live visibility forecasts. Smart predictions. Your personal dive log.</p>
+<div class="hero-container">
+    <img src="https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.png" />
+    <div class="hero-text">
+        <h1>Gaviota Coast Spearfishing Dashboard</h1>
+        <p>Live visibility forecasts. Smart predictions. Your personal dive log.</p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ---------- Pull Conditions ----------
-try:
-    swell_data = requests.get("https://marine.weather.gov/MapClick.php?lat=34.4&lon=-120.1&unit=0&lg=english&FcstType=json").json()
-    swell_height = swell_data['currentobservation'].get('swell_height_ft', "2.6")
-    swell_period = swell_data['currentobservation'].get('swell_period_sec', "13")
-    swell_dir = "WNW"
-    wind_speed = swell_data['currentobservation'].get('WindSpd', "5")
-    wind_dir = swell_data['currentobservation'].get('WindDir', "W")
-except:
-    swell_height, swell_period, swell_dir = "2.6", "13", "WNW"
-    wind_speed, wind_dir = "5", "W"
+with st.spinner("Pulling live swell, wind, and tide data..."):
+    try:
+        swell_data = requests.get("https://marine.weather.gov/MapClick.php?lat=34.4&lon=-120.1&unit=0&lg=english&FcstType=json").json()
+        swell_height = swell_data['currentobservation'].get('swell_height_ft', "2.6")
+        swell_period = swell_data['currentobservation'].get('swell_period_sec', "13")
+        swell_dir = "WNW"
+        wind_speed = swell_data['currentobservation'].get('WindSpd', "5")
+        wind_dir = swell_data['currentobservation'].get('WindDir', "W")
+    except:
+        swell_height, swell_period, swell_dir = "2.6", "13", "WNW"
+        wind_speed, wind_dir = "5", "W"
 
-# ---------- Tide + Current ----------
-tide_stage = "Rising"
-current_dir = "W (up)"
-try:
-    now = datetime.utcnow()
-    begin_date = now.strftime('%Y%m%d')
-    end_date = (now + timedelta(days=1)).strftime('%Y%m%d')
-    tide_url = f"https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date={begin_date}&end_date={end_date}&station=9411340&product=predictions&datum=MLLW&units=english&time_zone=gmt&format=json&interval=h"
-    tide_data = requests.get(tide_url).json()['predictions']
-    current_time = now.strftime('%Y-%m-%d %H')
-    levels = [(entry['t'], float(entry['v'])) for entry in tide_data if entry['t'].startswith(current_time)]
-    if len(levels) >= 2:
-        if levels[1][1] > levels[0][1]:
-            tide_stage, current_dir = "Rising", "W (up)"
-        else:
-            tide_stage, current_dir = "Falling", "E (down)"
-except:
-    pass
+    # ---------- Tide + Current ----------
+    tide_stage = "Rising"
+    current_dir = "W (up)"
+    try:
+        now = datetime.utcnow()
+        begin_date = now.strftime('%Y%m%d')
+        end_date = (now + timedelta(days=1)).strftime('%Y%m%d')
+        tide_url = f"https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date={begin_date}&end_date={end_date}&station=9411340&product=predictions&datum=MLLW&units=english&time_zone=gmt&format=json&interval=h"
+        tide_data = requests.get(tide_url).json()['predictions']
+        current_time = now.strftime('%Y-%m-%d %H')
+        levels = [(entry['t'], float(entry['v'])) for entry in tide_data if entry['t'].startswith(current_time)]
+        if len(levels) >= 2:
+            if levels[1][1] > levels[0][1]:
+                tide_stage, current_dir = "Rising", "W (up)"
+            else:
+                tide_stage, current_dir = "Falling", "E (down)"
+    except:
+        pass
 
 # ---------- Forecast Engine ----------
 def predict_vis(score_base):
