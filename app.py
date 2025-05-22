@@ -7,14 +7,24 @@ import os
 # ---------- Config ----------
 st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
-# ---------- Hero and Logo ----------
+# ---------- Custom Styles with Inter Font ----------
 st.markdown("""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap');
+
+    html, body, [class*="css"]  {
+        font-family: 'Inter', sans-serif !important;
+        color: #f1f1f1;
+    }
+    h1, h2, h3, h4 {
+        font-weight: 700;
+        letter-spacing: -0.5px;
+    }
     .block-container {
         padding-top: 0rem;
     }
     .hero {
-        background-image: url('https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.png');
+        background-image: url('https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.jpg');
         background-size: cover;
         background-position: center;
         padding: 4rem 2rem;
@@ -22,7 +32,10 @@ st.markdown("""
         color: white;
         text-align: center;
     }
-    </div>
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
     <div class="hero">
         <h1>Gaviota Coast Spearfishing Dashboard</h1>
         <p>Live visibility forecasts. Smart predictions. Your personal dive log.</p>
