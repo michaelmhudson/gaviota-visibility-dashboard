@@ -5,16 +5,7 @@ from datetime import datetime, timedelta
 import os
 
 # ---------- Config ----------
-st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="expanded")
-
-# ---------- Sidebar Navigation ----------
-st.sidebar.title("🧭 Navigation")
-st.sidebar.markdown("""
-- [🔎 Forecast](#forecast)
-- [📘 Log a Dive](#log-a-dive)
-- [📚 Your Dive Logbook](#your-dive-logbook)
-- [📡 Resources](#resources)
-""")
+st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
 # ---------- Custom Font & Styling ----------
 st.markdown("""
@@ -99,7 +90,6 @@ with st.spinner("Pulling live swell, wind, and tide data..."):
         swell_height, swell_period, swell_dir = "2.6", "13", "WNW"
         wind_speed, wind_dir = "5", "W"
 
-    # ---------- Tide + Current ----------
     tide_stage = "Rising"
     current_dir = "W (up)"
     try:
@@ -150,15 +140,18 @@ for spot, base in spots:
 
 df = pd.DataFrame(forecast)
 
-def color_score(val):
-    if val >= 4.5:
-        return 'background-color: #b7e1cd'
-    elif val >= 3:
-        return 'background-color: #fff2cc'
-    else:
-        return 'background-color: #f4cccc'
+def highlight_score(val):
+    styles = {
+        5: ('#b7e1cd', '#000000'),
+        4: ('#fff2cc', '#000000'),
+        3: ('#fff2cc', '#000000'),
+        2: ('#f4cccc', '#000000'),
+        1: ('#f4cccc', '#000000')
+    }
+    bg, fg = styles.get(val, ('#333', '#f1f1f1'))
+    return f'background-color: {bg}; color: {fg}'
 
-styled_df = df.style.format({"Score": "{:.0f}"}).applymap(color_score, subset=["Score"])
+styled_df = df.style.format({"Score": "{:.0f}"}).applymap(highlight_score, subset=["Score"])
 
 st.subheader("🔎 Forecast")
 st.dataframe(styled_df, use_container_width=True)
