@@ -22,15 +22,17 @@ st.markdown("""
         color: white;
         text-align: center;
     }
-    .logo-bar {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 1rem 0;
-    }
-    .logo-bar img {
-        height: 40px;
-    }
+   .logo-bar {
+    text-align: center;
+    margin: 1rem 0;
+}
+.logo-bar img {
+    height: 40px;
+    max-width: 100%;
+    object-fit: contain;
+    margin: 0 auto;
+    display: block;
+}
     </style>
 """, unsafe_allow_html=True)
 
