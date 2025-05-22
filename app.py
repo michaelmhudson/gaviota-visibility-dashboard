@@ -146,9 +146,10 @@ with st.spinner("Pulling live swell, wind, tide, rain, SST and chlorophyll data.
     - **Wind**: {best['Wind']}  
     - **Tide**: {best['Tide']} ({best['Current']})  
     - **Tide Rate**: {tide_rate:.2f} ft over 12 hrs  
-    - **Rain**: {rain_total:.2f}"  
+    - **Rain**: {rain_total:.2f} in  
     - **SST**: {sst:.1f}°F  
-    - **Chlorophyll**: {chlorophyll:.2f} mg/m³"")
+    - **Chlorophyll**: {chlorophyll:.2f} mg/m³
+    """)
 
     st.markdown("""
     ### 📘 Forecast Scoring Breakdown
@@ -159,3 +160,5 @@ with st.spinner("Pulling live swell, wind, tide, rain, SST and chlorophyll data.
     - SST < 57°F -> -1
     - Chlorophyll > 2 mg/m³ -> -1
     """)
+
+st.caption(f"Live data from NOAA, CDIP, and ERDDAP — updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
