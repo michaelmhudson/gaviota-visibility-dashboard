@@ -2,13 +2,49 @@ import streamlit as st
 import pandas as pd
 import requests
 from datetime import datetime, timedelta
+import os
 
-st.set_page_config(page_title="Gaviota Visibility", layout="wide")
+# ---------- Config ----------
+st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
-st.title("🌊 Gaviota Coast Daily Visibility Dashboard")
-st.markdown("Live spearfishing forecast based on swell, wind, and tide conditions.")
+# ---------- Hero and Logo ----------
+st.markdown("""
+    <style>
+    .block-container {
+        padding-top: 0rem;
+    }
+    .hero {
+        background-image: url('https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.jpg');
+        background-size: cover;
+        background-position: center;
+        padding: 4rem 2rem;
+        border-radius: 0.5rem;
+        color: white;
+        text-align: center;
+    }
+    .logo-bar {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 1rem 0;
+    }
+    .logo-bar img {
+        height: 40px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# --- Fetch Swell & Wind Data (Marine Weather / NOAA fallback) ---
+st.markdown("""
+    <div class="logo-bar">
+        <img src="https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/logo.png" alt="Logo">
+    </div>
+    <div class="hero">
+        <h1>Gaviota Coast Spearfishing Dashboard</h1>
+        <p>Live visibility forecasts. Smart predictions. Your personal dive log.</p>
+    </div>
+""", unsafe_allow_html=True)
+
+# ---------- Pull Conditions ----------
 try:
     swell_data = requests.get("https://marine.weather.gov/MapClick.php?lat=34.4&lon=-120.1&unit=0&lg=english&FcstType=json").json()
     swell_height = swell_data['currentobservation'].get('swell_height_ft', "2.6")
@@ -17,13 +53,10 @@ try:
     wind_speed = swell_data['currentobservation'].get('WindSpd', "5")
     wind_dir = swell_data['currentobservation'].get('WindDir', "W")
 except:
-    swell_height = "2.6"
-    swell_period = "13"
-    swell_dir = "WNW"
-    wind_speed = "5"
-    wind_dir = "W"
+    swell_height, swell_period, swell_dir = "2.6", "13", "WNW"
+    wind_speed, wind_dir = "5", "W"
 
-# --- Fetch Tide Data from NOAA (SB Harbor Station) ---
+# ---------- Tide + Current ----------
 tide_stage = "Rising"
 current_dir = "W (up)"
 try:
@@ -36,15 +69,13 @@ try:
     levels = [(entry['t'], float(entry['v'])) for entry in tide_data if entry['t'].startswith(current_time)]
     if len(levels) >= 2:
         if levels[1][1] > levels[0][1]:
-            tide_stage = "Rising"
-            current_dir = "W (up)"
+            tide_stage, current_dir = "Rising", "W (up)"
         else:
-            tide_stage = "Falling"
-            current_dir = "E (down)"
+            tide_stage, current_dir = "Falling", "E (down)"
 except:
     pass
 
-# --- Forecast Engine ---
+# ---------- Forecast Engine ----------
 def predict_vis(score_base):
     swell = float(swell_height)
     wind = float(wind_speed)
@@ -60,13 +91,11 @@ spots = [
     ("Mesa Lane", 3), ("Hendry’s", 3), ("Butterfly Beach", 2)
 ]
 
-data = []
+forecast = []
 for spot, base in spots:
     score = predict_vis(base)
-    vis_est = {
-        5: "15+ ft", 4: "8–10 ft", 3: "6–8 ft", 2: "4–6 ft", 1: "<4 ft"
-    }[max(1, min(5, round(score)))]
-    data.append({
+    vis_est = {5: "15+ ft", 4: "8–10 ft", 3: "6–8 ft", 2: "4–6 ft", 1: "<4 ft"}[max(1, min(5, round(score)))]
+    forecast.append({
         "Spot": spot,
         "Visibility": vis_est,
         "Tide": tide_stage,
@@ -76,8 +105,7 @@ for spot, base in spots:
         "Score": round(score)
     })
 
-# --- Display Table ---
-df = pd.DataFrame(data)
+df = pd.DataFrame(forecast)
 
 def color_score(val):
     if val >= 4.5:
@@ -89,10 +117,46 @@ def color_score(val):
 
 styled_df = df.style.format({"Score": "{:.0f}"}).applymap(color_score, subset=["Score"])
 
+st.subheader("🔎 Forecast")
 st.dataframe(styled_df, use_container_width=True)
 
+# ---------- Best Pick ----------
 best = df[df['Score'] == df['Score'].max()]
 st.subheader("🔱 Best Dive Pick Today")
 st.markdown(f"**{best.iloc[0]['Spot']}** — {best.iloc[0]['Visibility']} — {int(best.iloc[0]['Score'])}/5")
 
-st.caption(f"Live data: Swell = {swell_height} ft, Wind = {wind_speed} kt, Tide = {tide_stage} — Updated {datetime.now().strftime('%b %d, %I:%M %p')}")
+# ---------- Log Dive Section ----------
+st.subheader("📘 Log a Dive")
+log_file = "dive_log.csv"
+if not os.path.exists(log_file):
+    pd.DataFrame(columns=["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"]).to_csv(log_file, index=False)
+
+with st.form("log_form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        date = st.date_input("Date", value=datetime.today())
+        time = st.time_input("Time", value=datetime.now().time())
+        spot = st.selectbox("Spot", [s[0] for s in spots])
+    with col2:
+        vis = st.selectbox("Observed Visibility", ["<4 ft", "4–6 ft", "6–8 ft", "8–10 ft", "15+ ft"])
+        fish = st.text_input("Fish Taken")
+        notes = st.text_area("Notes", placeholder="Surge, bait, thermocline...")
+    submitted = st.form_submit_button("Save Entry")
+    if submitted:
+        new_entry = pd.DataFrame([[date, time.strftime('%H:%M'), spot, vis, notes, fish]],
+                                 columns=["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"])
+        new_entry.to_csv(log_file, mode='a', header=False, index=False)
+        st.success("Dive logged successfully!")
+
+# ---------- Dive Logbook Viewer ----------
+st.subheader("📚 Your Dive Logbook")
+log_df = pd.read_csv(log_file)
+st.dataframe(log_df.sort_values(by="Date", ascending=False), use_container_width=True)
+
+# ---------- Footer ----------
+st.caption(f"Live data from NOAA & CDIP — Last updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
+st.markdown("""
+**Resources:**  
+[Harvest CDIP Buoy](https://cdip.ucsd.edu/m/products/?buoy=100&xitem=spectra)  
+[NOAA Santa Barbara Tide Station](https://tidesandcurrents.noaa.gov/stationhome.html?id=9411340)
+""")
