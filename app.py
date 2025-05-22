@@ -27,22 +27,17 @@ st.markdown("""
         padding-top: 0rem;
     }
 
-    .hero {
-        background: url('https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.jpg') no-repeat center center;
-        background-size: cover;
-        padding: 4rem 2rem;
-        border-radius: 0.5rem;
-        color: white;
-        text-align: center;
-    }
-    </style>
-""", unsafe_allow_html=True)
+  st.image(
+    "https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.jpg",
+    use_column_width=True,
+    caption=None
+)
 
 st.markdown("""
-    <div class="hero">
-        <h1>Gaviota Coast Spearfishing Dashboard</h1>
-        <p>Live visibility forecasts. Smart predictions. Your personal dive log.</p>
-    </div>
+<div style='text-align: center; padding: 1rem 0;'>
+    <h1 style='margin-bottom: 0.25rem;'>Gaviota Coast Spearfishing Dashboard</h1>
+    <p style='font-size: 1.1rem; color: #cccccc;'>Live visibility forecasts. Smart predictions. Your personal dive log.</p>
+</div>
 """, unsafe_allow_html=True)
 
 # ---------- Pull Conditions ----------
