@@ -59,7 +59,7 @@ spots = [
     ("Mesa Lane", 3), ("Hendry’s", 3), ("Butterfly Beach", 2)
 ]
 
-# Initialize default values
+# Default values
 swell_height, swell_period, swell_dir = 2.6, 13, "WNW"
 wind_speed, wind_dir = 5, "W"
 tide_stage, current_dir = "Rising", "W (up)"
@@ -68,7 +68,7 @@ rain_total = 0
 sst = 60
 chlorophyll = 1.5
 
-# Try to pull live data
+# Pull live data
 with st.spinner("Loading live data..."):
     try:
         swell_data = requests.get("https://marine.weather.gov/MapClick.php?lat=34.4&lon=-120.1&unit=0&lg=english&FcstType=json").json()
@@ -117,7 +117,6 @@ with st.spinner("Loading live data..."):
         if chlorophyll > 2: score -= 1
         return max(1, min(score, 5))
 
-    # Adaptive scoring from logs
     spot_adjustments = {}
     try:
         dive_log_df = pd.read_csv(LOG_FILE)
@@ -138,10 +137,16 @@ with st.spinner("Loading live data..."):
         forecast.append({
             "Spot": spot, "Visibility": vis, "Tide": tide_stage, "Current": current_dir,
             "Swell": f"{swell_height:.1f} @ {swell_period:.0f}s {swell_dir}",
-            "Wind": f"{wind_speed:.0f} kt {wind_dir}", "Score": score
+            "Wind": f"{wind_speed:.0f} kt {wind_dir}",
+            "Rain (in)": f"{rain_total:.2f}",
+            "SST (°F)": f"{sst:.1f}",
+            "Tide Δ (ft)": f"{tide_rate:.2f}",
+            "Chl (mg/m³)": f"{chlorophyll:.2f}",
+            "Score": score
         })
 
     df = pd.DataFrame(forecast)
+
     def highlight_score(val): return f'background-color: {"#f4cccc" if val <= 2 else "#fff2cc" if val <= 4 else "#b7e1cd"}; color: #000000'
     st.dataframe(df.style.format({"Score": "{:.0f}"}).applymap(highlight_score, subset=["Score"]), use_container_width=True)
 
