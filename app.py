@@ -11,6 +11,7 @@ EXPECTED_COLS = ["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"]
 if not os.path.exists(LOG_FILE):
     pd.DataFrame(columns=EXPECTED_COLS).to_csv(LOG_FILE, index=False)
 
+# ---------- HERO ----------
 st.markdown("""
     <style>
     html, body, [class*="css"]  {
@@ -41,7 +42,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ---------- FORECAST ----------
 st.subheader("🔎 Forecast")
+
 with st.spinner("Pulling live swell, wind, tide, rain, SST and chlorophyll data..."):
     try:
         swell_data = requests.get("https://marine.weather.gov/MapClick.php?lat=34.4&lon=-120.1&unit=0&lg=english&FcstType=json").json()
@@ -116,7 +119,7 @@ with st.spinner("Pulling live swell, wind, tide, rain, SST and chlorophyll data.
         ("Mesa Lane", 3), ("Hendry’s", 3), ("Butterfly Beach", 2)
     ]
 
-    # ---------- Adaptive Forecast Based on Logs ----------
+    # ADAPTIVE FORECASTING
     dive_log_df = pd.read_csv(LOG_FILE) if os.path.exists(LOG_FILE) else pd.DataFrame(columns=EXPECTED_COLS)
     spot_adjustments = {}
     try:
@@ -170,12 +173,12 @@ with st.spinner("Pulling live swell, wind, tide, rain, SST and chlorophyll data.
 
     st.markdown("""
     ### 📘 Forecast Scoring Breakdown
-    - Swell > 3 ft or Wind > 10 kt -> -1
-    - Swell < 2 ft and Wind < 5 kt -> +1
-    - Tide rate > 1.5 ft (12 hrs) -> -1
-    - Rain > 0.1" -> -1
-    - SST < 57°F -> -1
-    - Chlorophyll > 2 mg/m³ -> -1
+    - Swell > 3 ft or Wind > 10 kt -> -1  
+    - Swell < 2 ft and Wind < 5 kt -> +1  
+    - Tide rate > 1.5 ft (12 hrs) -> -1  
+    - Rain > 0.1" -> -1  
+    - SST < 57°F -> -1  
+    - Chlorophyll > 2 mg/m³ -> -1  
     """)
 
 st.caption(f"Live data from NOAA, CDIP, and ERDDAP — updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
