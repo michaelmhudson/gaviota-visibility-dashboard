@@ -116,9 +116,26 @@ with st.spinner("Pulling live swell, wind, tide, rain, SST and chlorophyll data.
         ("Mesa Lane", 3), ("Hendry’s", 3), ("Butterfly Beach", 2)
     ]
 
+    # ---------- Adaptive Forecast Based on Logs ----------
+    dive_log_df = pd.read_csv(LOG_FILE) if os.path.exists(LOG_FILE) else pd.DataFrame(columns=EXPECTED_COLS)
+    spot_adjustments = {}
+    try:
+        for spot, base in spots:
+            spot_logs = dive_log_df[dive_log_df["Spot"] == spot]
+            if not spot_logs.empty:
+                log_scores = spot_logs["Visibility"].map({"<4 ft": 1, "4–6 ft": 2, "6–8 ft": 3, "8–10 ft": 4, "15+ ft": 5})
+                observed_avg = log_scores.mean()
+                adjustment = round(observed_avg - base)
+                spot_adjustments[spot] = base + adjustment
+            else:
+                spot_adjustments[spot] = base
+    except Exception as e:
+        spot_adjustments = {spot: base for spot, base in spots}
+
     forecast = []
     for spot, base in spots:
-        score = predict_vis(base)
+        adjusted_base = spot_adjustments.get(spot, base)
+        score = predict_vis(adjusted_base)
         vis_est = {5: "15+ ft", 4: "8–10 ft", 3: "6–8 ft", 2: "4–6 ft", 1: "<4 ft"}[score]
         forecast.append({
             "Spot": spot,
@@ -162,35 +179,3 @@ with st.spinner("Pulling live swell, wind, tide, rain, SST and chlorophyll data.
     """)
 
 st.caption(f"Live data from NOAA, CDIP, and ERDDAP — updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
- # ---------- Adaptive Scoring from Dive Logs ----------
-    dive_log_df = pd.read_csv(LOG_FILE) if os.path.exists(LOG_FILE) else pd.DataFrame(columns=EXPECTED_COLS)
-    spot_adjustments = {}
-    try:
-        for spot, base in spots:
-            spot_logs = dive_log_df[dive_log_df["Spot"] == spot]
-            if not spot_logs.empty:
-                log_scores = spot_logs["Visibility"].map({"<4 ft": 1, "4–6 ft": 2, "6–8 ft": 3, "8–10 ft": 4, "15+ ft": 5})
-                observed_avg = log_scores.mean()
-                adjustment = round(observed_avg - base)
-                spot_adjustments[spot] = base + adjustment
-            else:
-                spot_adjustments[spot] = base
-    except Exception as e:
-        spot_adjustments = {spot: base for spot, base in spots}
-
-    forecast = []
-    for spot, base in spots:
-        adjusted_base = spot_adjustments.get(spot, base)
-        score = predict_vis(adjusted_base)
-        vis_est = {5: "15+ ft", 4: "8–10 ft", 3: "6–8 ft", 2: "4–6 ft", 1: "<4 ft"}[score]
-        forecast.append({
-            "Spot": spot,
-            "Visibility": vis_est,
-            "Tide": tide_stage,
-            "Current": current_dir,
-            "Swell": f"{swell_height:.1f} @ {swell_period:.0f}s {swell_dir}",
-            "Wind": f"{wind_speed:.0f} kt {wind_dir}",
-            "Score": score
-        })
-
-    df = pd.DataFrame(forecast)
