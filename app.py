@@ -14,8 +14,7 @@ if not os.path.exists(LOG_FILE):
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Nosifer&display=swap');
-
-    html, body, [class*="css"]  {
+    html, body, [class*="css"] {
         background-color: #0e1117;
         color: #f1f1f1;
         font-family: 'Inter', sans-serif;
@@ -52,16 +51,121 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---------- Accuracy Chart ----------
-try:
-    dive_log_df = pd.read_csv(LOG_FILE)
-    dive_log_df["Visibility"] = dive_log_df["Visibility"].str.strip()
-    log_scores = dive_log_df["Visibility"].map({"<4 ft": 1, "4–6 ft": 2, "6–8 ft": 3, "8–10 ft": 4, "15+ ft": 5})
-    spot_avg_actual = dive_log_df.groupby("Spot")["Visibility"].apply(lambda x: x.map({"<4 ft": 1, "4–6 ft": 2, "6–8 ft": 3, "8–10 ft": 4, "15+ ft": 5}).mean())
-    spot_avg_pred = pd.read_csv("forecast.csv") if os.path.exists("forecast.csv") else pd.DataFrame(columns=["Spot", "Score"])
-    if not spot_avg_pred.empty:
-        chart_df = pd.merge(spot_avg_pred, spot_avg_actual, on="Spot", suffixes=("_Predicted", "_Actual"))
-        st.subheader("🎯 Forecast vs Actual Accuracy")
-        st.bar_chart(chart_df.set_index("Spot"))
-except Exception as e:
-    st.caption("No accuracy data available yet. Log a few dives and it will appear here.")
+st.subheader("🔎 Forecast")
+
+spots = [
+    ("Tajiguas", 4), ("Arroyo Quemado", 4), ("Refugio", 3),
+    ("Drake’s / Naples", 5), ("Coal Oil Point", 4), ("Haskell’s", 3),
+    ("Mesa Lane", 3), ("Hendry’s", 3), ("Butterfly Beach", 2)
+]
+
+# Initialize default values
+swell_height, swell_period, swell_dir = 2.6, 13, "WNW"
+wind_speed, wind_dir = 5, "W"
+tide_stage, current_dir = "Rising", "W (up)"
+tide_rate = 0
+rain_total = 0
+sst = 60
+chlorophyll = 1.5
+
+# Try to pull live data
+with st.spinner("Loading live data..."):
+    try:
+        swell_data = requests.get("https://marine.weather.gov/MapClick.php?lat=34.4&lon=-120.1&unit=0&lg=english&FcstType=json").json()
+        swell_height = float(swell_data['currentobservation'].get('swell_height_ft', swell_height))
+        swell_period = float(swell_data['currentobservation'].get('swell_period_sec', swell_period))
+        wind_speed = float(swell_data['currentobservation'].get('WindSpd', wind_speed))
+        wind_dir = swell_data['currentobservation'].get('WindDir', wind_dir)
+        sst = float(swell_data['currentobservation'].get('Temp', sst))
+    except: pass
+
+    try:
+        now = datetime.utcnow()
+        begin_date = now.strftime('%Y%m%d')
+        end_date = (now + timedelta(days=1)).strftime('%Y%m%d')
+        tide_url = f"https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date={begin_date}&end_date={end_date}&station=9411340&product=predictions&datum=MLLW&units=english&time_zone=gmt&format=json&interval=6"
+        tide_data = requests.get(tide_url).json()['predictions']
+        recent = [float(entry['v']) for entry in tide_data[-3:]]
+        tide_rate = abs(recent[-1] - recent[0])
+        tide_stage, current_dir = ("Rising", "W (up)") if recent[-1] > recent[0] else ("Falling", "E (down)")
+    except: pass
+
+    try:
+        rain_url = "https://api.weather.gov/gridpoints/LOX/97,156/forecast"
+        rain_data = requests.get(rain_url).json()
+        periods = rain_data['properties']['periods']
+        for p in periods[:6]:
+            if 'rain' in p['shortForecast'].lower():
+                rain_total += 0.05
+    except: pass
+
+    try:
+        chl_url = "https://coastwatch.pfeg.noaa.gov/erddap/tabledap/erdMH1chla1day.json?chlorophyll&latitude=34.4&longitude=-120.1&orderBy(%22time%22)"
+        chl_data = requests.get(chl_url).json()
+        records = chl_data['table']['rows']
+        if records:
+            chlorophyll = float(records[-1][0])
+    except: pass
+
+    def predict_vis(base):
+        score = base
+        if swell_height > 3 or wind_speed > 10: score -= 1
+        if swell_height < 2 and wind_speed < 5: score += 1
+        if tide_rate > 1.5: score -= 1
+        if rain_total > 0.1: score -= 1
+        if sst < 57: score -= 1
+        if chlorophyll > 2: score -= 1
+        return max(1, min(score, 5))
+
+    # Adaptive scoring from logs
+    spot_adjustments = {}
+    try:
+        dive_log_df = pd.read_csv(LOG_FILE)
+        dive_log_df["Visibility"] = dive_log_df["Visibility"].str.strip()
+        for spot, base in spots:
+            logs = dive_log_df[dive_log_df["Spot"] == spot]
+            mapped = logs["Visibility"].map({"<4 ft": 1, "4–6 ft": 2, "6–8 ft": 3, "8–10 ft": 4, "15+ ft": 5}).dropna()
+            adj = round(mapped.mean() - base) if not mapped.empty else 0
+            spot_adjustments[spot] = base + adj
+    except:
+        spot_adjustments = {spot: base for spot, base in spots}
+
+    forecast = []
+    for spot, base in spots:
+        adjusted = spot_adjustments.get(spot, base)
+        score = predict_vis(adjusted)
+        vis = {5: "15+ ft", 4: "8–10 ft", 3: "6–8 ft", 2: "4–6 ft", 1: "<4 ft"}[score]
+        forecast.append({
+            "Spot": spot, "Visibility": vis, "Tide": tide_stage, "Current": current_dir,
+            "Swell": f"{swell_height:.1f} @ {swell_period:.0f}s {swell_dir}",
+            "Wind": f"{wind_speed:.0f} kt {wind_dir}", "Score": score
+        })
+
+    df = pd.DataFrame(forecast)
+    def highlight_score(val): return f'background-color: {"#f4cccc" if val <= 2 else "#fff2cc" if val <= 4 else "#b7e1cd"}; color: #000000'
+    st.dataframe(df.style.format({"Score": "{:.0f}"}).applymap(highlight_score, subset=["Score"]), use_container_width=True)
+
+    best = df[df['Score'] == df['Score'].max()].iloc[0]
+    st.subheader("🔱 Best Dive Pick Today")
+    st.markdown(f"""
+    **{best['Spot']}** — {best['Visibility']} — {int(best['Score'])}/5  
+    - **Swell**: {best['Swell']}  
+    - **Wind**: {best['Wind']}  
+    - **Tide**: {best['Tide']} ({best['Current']})  
+    - **Tide Rate**: {tide_rate:.2f} ft over 12 hrs  
+    - **Rain**: {rain_total:.2f} in  
+    - **SST**: {sst:.1f}°F  
+    - **Chlorophyll**: {chlorophyll:.2f} mg/m³
+    """)
+
+    st.markdown("""
+    ### 📘 Forecast Scoring Breakdown
+    - Swell > 3 ft or Wind > 10 kt -> -1  
+    - Swell < 2 ft and Wind < 5 kt -> +1  
+    - Tide rate > 1.5 ft (12 hrs) -> -1  
+    - Rain > 0.1" -> -1  
+    - SST < 57°F -> -1  
+    - Chlorophyll > 2 mg/m³ -> -1  
+    """)
+
+st.caption(f"Live data from NOAA, CDIP, and ERDDAP — updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
