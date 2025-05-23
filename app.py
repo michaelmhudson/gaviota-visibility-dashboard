@@ -1,80 +1,67 @@
-# ... existing code above remains the same
-    # ---------- Adaptive Forecast Based on Logs ----------
-    dive_log_df = pd.read_csv(LOG_FILE) if os.path.exists(LOG_FILE) else pd.DataFrame(columns=EXPECTED_COLS)
-    spot_adjustments = {}
-    debug_rows = []
-    try:
-        for spot, base in spots:
-            spot_logs = dive_log_df[dive_log_df["Spot"] == spot].copy()
-            if not spot_logs.empty:
-                # Clean up unexpected spacing or characters
-                spot_logs["Visibility"] = spot_logs["Visibility"].str.strip()
-                log_scores = spot_logs["Visibility"].map({"<4 ft": 1, "4–6 ft": 2, "6–8 ft": 3, "8–10 ft": 4, "15+ ft": 5})
-                log_scores = log_scores.dropna()
-                if not log_scores.empty:
-                    observed_avg = log_scores.mean()
-                    adjustment = round(observed_avg - base)
-                    adjusted = base + adjustment
-                    spot_adjustments[spot] = adjusted
-                    debug_rows.append(f"{spot}: base {base}, observed avg {observed_avg:.1f}, adjusted {adjusted}")
-                else:
-                    spot_adjustments[spot] = base
-                    debug_rows.append(f"{spot}: no usable log scores, using base {base}")
-            else:
-                spot_adjustments[spot] = base
-                debug_rows.append(f"{spot}: no logs, using base {base}")
-    except Exception as e:
-        spot_adjustments = {spot: base for spot, base in spots}
-        debug_rows.append("ERROR in log-based scoring")
+import streamlit as st
+import pandas as pd
+import requests
+from datetime import datetime, timedelta
+import os
 
-    forecast = []
-    for spot, base in spots:
-        adjusted_base = spot_adjustments.get(spot, base)
-        score = predict_vis(adjusted_base)
-        vis_est = {5: "15+ ft", 4: "8–10 ft", 3: "6–8 ft", 2: "4–6 ft", 1: "<4 ft"}[score]
-        forecast.append({
-            "Spot": spot,
-            "Visibility": vis_est,
-            "Tide": tide_stage,
-            "Current": current_dir,
-            "Swell": f"{swell_height:.1f} @ {swell_period:.0f}s {swell_dir}",
-            "Wind": f"{wind_speed:.0f} kt {wind_dir}",
-            "Score": score
-        })
+st.set_page_config(page_title="Gaviota Visibility Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
-    df = pd.DataFrame(forecast)
-    def highlight_score(val):
-        bg = '#f4cccc' if val <= 2 else '#fff2cc' if val <= 4 else '#b7e1cd'
-        return f'background-color: {bg}; color: #000000'
+LOG_FILE = "dive_log.csv"
+EXPECTED_COLS = ["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"]
+if not os.path.exists(LOG_FILE):
+    pd.DataFrame(columns=EXPECTED_COLS).to_csv(LOG_FILE, index=False)
 
-    st.dataframe(df.style.format({"Score": "{:.0f}"}).applymap(highlight_score, subset=["Score"]), use_container_width=True)
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nosifer&display=swap');
 
-    best = df[df['Score'] == df['Score'].max()].iloc[0]
-    st.subheader("🔱 Best Dive Pick Today")
-    st.markdown(f"""
-    **{best['Spot']}** — {best['Visibility']} — {int(best['Score'])}/5  
-    - **Swell**: {best['Swell']}  
-    - **Wind**: {best['Wind']}  
-    - **Tide**: {best['Tide']} ({best['Current']})  
-    - **Tide Rate**: {tide_rate:.2f} ft over 12 hrs  
-    - **Rain**: {rain_total:.2f} in  
-    - **SST**: {sst:.1f}°F  
-    - **Chlorophyll**: {chlorophyll:.2f} mg/m³
-    """)
+    html, body, [class*="css"]  {
+        background-color: #0e1117;
+        color: #f1f1f1;
+        font-family: 'Inter', sans-serif;
+    }
+    .hero-container img {
+        width: 100%; max-height: 240px; object-fit: cover; border-radius: 0.5rem;
+    }
+    .hero-text {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        text-align: center; background: rgba(0,0,0,0.4);
+        padding: 1rem 1.5rem; border-radius: 0.5rem; width: 90%;
+    }
+    .hero-text h1 {
+        font-size: 2rem;
+        margin-bottom: 0.3rem;
+        color: white;
+        font-family: 'Nosifer', cursive;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+    }
+    .hero-text p {
+        font-size: 1rem;
+        color: #e0e0e0;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-    st.markdown("""
-    ### 📘 Forecast Scoring Breakdown
-    - Swell > 3 ft or Wind > 10 kt -> -1
-    - Swell < 2 ft and Wind < 5 kt -> +1
-    - Tide rate > 1.5 ft (12 hrs) -> -1
-    - Rain > 0.1" -> -1
-    - SST < 57°F -> -1
-    - Chlorophyll > 2 mg/m³ -> -1
-    """)
+st.markdown("""
+<div class="hero-container">
+    <img src="https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.png" />
+    <div class="hero-text">
+        <h1>Gaviota Coast Spearfishing Dashboard</h1>
+        <p>Live visibility forecasts. Smart predictions. Your personal dive log.</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-    st.markdown("""
-    #### 🔬 Adaptive Adjustments from Dive Logs
-    <pre style='font-size: 0.9rem;'>
-    """ + "\n".join(debug_rows) + """
-    </pre>
-    """, unsafe_allow_html=True)
+# ---------- Accuracy Chart ----------
+try:
+    dive_log_df = pd.read_csv(LOG_FILE)
+    dive_log_df["Visibility"] = dive_log_df["Visibility"].str.strip()
+    log_scores = dive_log_df["Visibility"].map({"<4 ft": 1, "4–6 ft": 2, "6–8 ft": 3, "8–10 ft": 4, "15+ ft": 5})
+    spot_avg_actual = dive_log_df.groupby("Spot")["Visibility"].apply(lambda x: x.map({"<4 ft": 1, "4–6 ft": 2, "6–8 ft": 3, "8–10 ft": 4, "15+ ft": 5}).mean())
+    spot_avg_pred = pd.read_csv("forecast.csv") if os.path.exists("forecast.csv") else pd.DataFrame(columns=["Spot", "Score"])
+    if not spot_avg_pred.empty:
+        chart_df = pd.merge(spot_avg_pred, spot_avg_actual, on="Spot", suffixes=("_Predicted", "_Actual"))
+        st.subheader("🎯 Forecast vs Actual Accuracy")
+        st.bar_chart(chart_df.set_index("Spot"))
+except Exception as e:
+    st.caption("No accuracy data available yet. Log a few dives and it will appear here.")
