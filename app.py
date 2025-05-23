@@ -11,55 +11,20 @@ EXPECTED_COLS = ["Date", "Time", "Spot", "Visibility", "Notes", "Fish Taken"]
 if not os.path.exists(LOG_FILE):
     pd.DataFrame(columns=EXPECTED_COLS).to_csv(LOG_FILE, index=False)
 
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Nosifer&display=swap');
-    html, body, [class*="css"] {
-        background-color: #0e1117;
-        color: #f1f1f1;
-        font-family: 'Inter', sans-serif;
-    }
-    .hero-container img {
-        width: 100%; max-height: 240px; object-fit: cover; border-radius: 0.5rem;
-    }
-    .hero-text {
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        text-align: center; background: rgba(0,0,0,0.4);
-        padding: 1rem 1.5rem; border-radius: 0.5rem; width: 90%;
-    }
-    .hero-text h1 {
-        font-size: 2rem;
-        margin-bottom: 0.3rem;
-        color: white;
-        font-family: 'Nosifer', cursive;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
-    }
-    .hero-text p {
-        font-size: 1rem;
-        color: #e0e0e0;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# ------------------ Site Metadata ------------------
+site_profiles = {
+    "Tajiguas": {"base": 4, "swell_exposure": 0.6, "runoff": 0.4},
+    "Arroyo Quemado": {"base": 4, "swell_exposure": 0.6, "runoff": 0.5},
+    "Refugio": {"base": 3, "swell_exposure": 0.4, "runoff": 0.6},
+    "Drake’s / Naples": {"base": 5, "swell_exposure": 0.3, "runoff": 0.2},
+    "Coal Oil Point": {"base": 4, "swell_exposure": 0.5, "runoff": 0.6},
+    "Haskell’s": {"base": 3, "swell_exposure": 0.7, "runoff": 0.8},
+    "Mesa Lane": {"base": 3, "swell_exposure": 0.6, "runoff": 0.7},
+    "Hendry’s": {"base": 3, "swell_exposure": 0.5, "runoff": 0.9},
+    "Butterfly Beach": {"base": 2, "swell_exposure": 0.4, "runoff": 0.3},
+}
 
-st.markdown("""
-<div class="hero-container">
-    <img src="https://raw.githubusercontent.com/michaelmhudson/gaviota-visibility-dashboard/main/assets/hero.png" />
-    <div class="hero-text">
-        <h1>Gaviota Coast Spearfishing Dashboard</h1>
-        <p>Live visibility forecasts. Smart predictions. Your personal dive log.</p>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-st.subheader("🔎 Forecast")
-
-spots = [
-    ("Tajiguas", 4), ("Arroyo Quemado", 4), ("Refugio", 3),
-    ("Drake’s / Naples", 5), ("Coal Oil Point", 4), ("Haskell’s", 3),
-    ("Mesa Lane", 3), ("Hendry’s", 3), ("Butterfly Beach", 2)
-]
-
-# Default values
+# ------------------ Live Data Pull ------------------
 swell_height, swell_period, swell_dir = 2.6, 13, "WNW"
 wind_speed, wind_dir = 5, "W"
 tide_stage, current_dir = "Rising", "W (up)"
@@ -68,15 +33,14 @@ rain_total = 0
 sst = 60
 chlorophyll = 1.5
 
-# Pull live data
 with st.spinner("Loading live data..."):
     try:
         swell_data = requests.get("https://marine.weather.gov/MapClick.php?lat=34.4&lon=-120.1&unit=0&lg=english&FcstType=json").json()
-        swell_height = float(swell_data['currentobservation'].get('swell_height_ft', swell_height))
-        swell_period = float(swell_data['currentobservation'].get('swell_period_sec', swell_period))
-        wind_speed = float(swell_data['currentobservation'].get('WindSpd', wind_speed))
-        wind_dir = swell_data['currentobservation'].get('WindDir', wind_dir)
-        sst = float(swell_data['currentobservation'].get('Temp', sst))
+        swell_height = float(swell_data['currentobservation'].get('swell_height_ft', 2.6))
+        swell_period = float(swell_data['currentobservation'].get('swell_period_sec', 13))
+        wind_speed = float(swell_data['currentobservation'].get('WindSpd', 5))
+        wind_dir = swell_data['currentobservation'].get('WindDir', "W")
+        sst = float(swell_data['currentobservation'].get('Temp', 60))
     except: pass
 
     try:
@@ -107,70 +71,84 @@ with st.spinner("Loading live data..."):
             chlorophyll = float(records[-1][0])
     except: pass
 
-    def predict_vis(base):
-        score = base
-        if swell_height > 3 or wind_speed > 10: score -= 1
-        if swell_height < 2 and wind_speed < 5: score += 1
-        if tide_rate > 1.5: score -= 1
-        if rain_total > 0.1: score -= 1
-        if sst < 57: score -= 1
-        if chlorophyll > 2: score -= 1
-        return max(1, min(score, 5))
+# ------------------ Adaptive Forecast ------------------
+try:
+    dive_log_df = pd.read_csv(LOG_FILE)
+    dive_log_df["Visibility"] = dive_log_df["Visibility"].str.strip()
+except:
+    dive_log_df = pd.DataFrame(columns=EXPECTED_COLS)
 
-    spot_adjustments = {}
-    try:
-        dive_log_df = pd.read_csv(LOG_FILE)
-        dive_log_df["Visibility"] = dive_log_df["Visibility"].str.strip()
-        for spot, base in spots:
-            logs = dive_log_df[dive_log_df["Spot"] == spot]
-            mapped = logs["Visibility"].map({"<4 ft": 1, "4–6 ft": 2, "6–8 ft": 3, "8–10 ft": 4, "15+ ft": 5}).dropna()
-            adj = round(mapped.mean() - base) if not mapped.empty else 0
-            spot_adjustments[spot] = base + adj
-    except:
-        spot_adjustments = {spot: base for spot, base in spots}
+forecast = []
+for spot, meta in site_profiles.items():
+    base = meta["base"]
+    exposure = meta["swell_exposure"]
+    runoff = meta["runoff"]
 
-    forecast = []
-    for spot, base in spots:
-        adjusted = spot_adjustments.get(spot, base)
-        score = predict_vis(adjusted)
-        vis = {5: "15+ ft", 4: "8–10 ft", 3: "6–8 ft", 2: "4–6 ft", 1: "<4 ft"}[score]
-        forecast.append({
-            "Spot": spot, "Visibility": vis, "Tide": tide_stage, "Current": current_dir,
-            "Swell": f"{swell_height:.1f} @ {swell_period:.0f}s {swell_dir}",
-            "Wind": f"{wind_speed:.0f} kt {wind_dir}",
-            "Rain (in)": f"{rain_total:.2f}",
-            "SST (°F)": f"{sst:.1f}",
-            "Tide Δ (ft)": f"{tide_rate:.2f}",
-            "Chl (mg/m³)": f"{chlorophyll:.2f}",
-            "Score": score
-        })
+    # Dive log adaptive adjustment
+    logs = dive_log_df[dive_log_df["Spot"] == spot]
+    mapped = logs["Visibility"].map({"<4 ft": 1, "4–6 ft": 2, "6–8 ft": 3, "8–10 ft": 4, "15+ ft": 5}).dropna()
+    base_adj = round(mapped.mean() - base) if not mapped.empty else 0
+    adjusted_base = base + base_adj
 
-    df = pd.DataFrame(forecast)
+    # Live condition adjustments
+    score = adjusted_base
+    if swell_height * exposure > 3: score -= 1
+    if swell_height * exposure < 2 and wind_speed < 5: score += 1
+    if wind_speed > 10: score -= 1
+    if tide_rate > 1.5: score -= 1
+    if rain_total * runoff > 0.1: score -= 1
+    if sst < 57: score -= 1
+    if chlorophyll > 2: score -= 1
+    score = max(1, min(score, 5))
+    vis = {5: "15+ ft", 4: "8–10 ft", 3: "6–8 ft", 2: "4–6 ft", 1: "<4 ft"}[score]
 
-    def highlight_score(val): return f'background-color: {"#f4cccc" if val <= 2 else "#fff2cc" if val <= 4 else "#b7e1cd"}; color: #000000'
-    st.dataframe(df.style.format({"Score": "{:.0f}"}).applymap(highlight_score, subset=["Score"]), use_container_width=True)
+    forecast.append({
+        "Spot": spot,
+        "Visibility": vis,
+        "Base": base,
+        "Adj": base_adj,
+        "Score": score,
+        "Swell": f"{swell_height:.1f} @ {swell_period:.0f}s {swell_dir}",
+        "Wind": f"{wind_speed:.0f} kt {wind_dir}",
+        "Tide": tide_stage,
+        "Current": current_dir,
+        "Tide Δ (ft)": f"{tide_rate:.2f}",
+        "Rain (in)": f"{rain_total:.2f}",
+        "SST (°F)": f"{sst:.1f}",
+        "Chl (mg/m³)": f"{chlorophyll:.2f}"
+    })
 
-    best = df[df['Score'] == df['Score'].max()].iloc[0]
-    st.subheader("🔱 Best Dive Pick Today")
-    st.markdown(f"""
-    **{best['Spot']}** — {best['Visibility']} — {int(best['Score'])}/5  
-    - **Swell**: {best['Swell']}  
-    - **Wind**: {best['Wind']}  
-    - **Tide**: {best['Tide']} ({best['Current']})  
-    - **Tide Rate**: {tide_rate:.2f} ft over 12 hrs  
-    - **Rain**: {rain_total:.2f} in  
-    - **SST**: {sst:.1f}°F  
-    - **Chlorophyll**: {chlorophyll:.2f} mg/m³
-    """)
+df = pd.DataFrame(forecast)
 
-    st.markdown("""
-    ### 📘 Forecast Scoring Breakdown
-    - Swell > 3 ft or Wind > 10 kt -> -1  
-    - Swell < 2 ft and Wind < 5 kt -> +1  
-    - Tide rate > 1.5 ft (12 hrs) -> -1  
-    - Rain > 0.1" -> -1  
-    - SST < 57°F -> -1  
-    - Chlorophyll > 2 mg/m³ -> -1  
-    """)
+def highlight_score(val):
+    bg = '#f4cccc' if val <= 2 else '#fff2cc' if val <= 4 else '#b7e1cd'
+    return f'background-color: {bg}; color: #000000'
+
+st.dataframe(df.style.format({"Score": "{:.0f}"}).applymap(highlight_score, subset=["Score"]), use_container_width=True)
+
+best = df[df["Score"] == df["Score"].max()].iloc[0]
+st.subheader("🔱 Best Dive Pick Today")
+st.markdown(f"""
+**{best['Spot']}** — {best['Visibility']} — {int(best['Score'])}/5  
+- **Swell**: {best['Swell']}  
+- **Wind**: {best['Wind']}  
+- **Tide**: {best['Tide']} ({best['Current']})  
+- **Tide Rate**: {best['Tide Δ (ft)']}  
+- **Rain**: {best['Rain (in)']}  
+- **SST**: {best['SST (°F)']}  
+- **Chlorophyll**: {best['Chl (mg/m³)']}
+""")
+
+st.markdown("""
+### 📘 Forecast Scoring Breakdown
+- Base score per spot from historical + dive log
+- Adjustments based on:
+  - Swell * swell exposure
+  - Wind speed
+  - Tide rate
+  - Rainfall * runoff sensitivity
+  - SST < 57°F
+  - Chlorophyll > 2 mg/m³
+""")
 
 st.caption(f"Live data from NOAA, CDIP, and ERDDAP — updated {datetime.now().strftime('%b %d, %I:%M %p')} PST")
